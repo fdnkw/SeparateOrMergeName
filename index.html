@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="th" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ครูฟาดิล | ระบบจัดการ(แยก/รวม)รายชื่อ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/papaparse@5.3.0/papaparse.min.js"></script>
+    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #2dd4bf; /* teal-400 */
+            --secondary: #0891b2; /* cyan-600 */
+        }
+        
+        body {
+            font-family: 'Prompt', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(45, 212, 191, 0.2), 0 4px 6px -2px rgba(8, 145, 178, 0.2);
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .loader {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .dark .loader {
+            border-color: rgba(255, 255, 255, 0.1);
+            border-left-color: var(--primary);
+        }
+        
+        .btn-template {
+            transition: all 0.2s;
+        }
+        
+        .btn-template:hover {
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-slate-900 dark:text-gray-100 transition-colors">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-teal-500">
+                ระบบจัดการ(แยก/รวม)รายชื่อ
+            </h1>
+            <button id="themeToggle" class="p-2 rounded-full bg-gray-200 dark:bg-slate-700 transition-colors">
+                <svg id="lightIcon" class="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"></path>
+                </svg>
+                <svg id="darkIcon" class="w-6 h-6 text-slate-300 hidden" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+                </svg>
+            </button>
+        </header>
+
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 mb-8 transition-colors">
+            <h2 class="text-xl font-semibold mb-4 text-cyan-700 dark:text-cyan-300">1. ดาวน์โหลด Template (ถ้ายังไม่มีไฟล์)</h2>
+            <div class="flex flex-wrap gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 flex-1 min-w-[250px]">
+                    <h3 class="font-medium text-gray-700 dark:text-gray-300 mb-2">Template สำหรับ "รวมชื่อ"</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">มีคอลัมน์: คำนำหน้า, ชื่อ, นามสกุล</p>
+                    <div class="flex gap-2">
+                        <button id="downloadCombineTemplateCSV" class="btn-template bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 text-green-800 dark:text-green-200 py-2 px-4 rounded-lg text-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            CSV
+                        </button>
+                        <button id="downloadCombineTemplateExcel" class="btn-template bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-800 dark:text-blue-200 py-2 px-4 rounded-lg text-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Excel
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 flex-1 min-w-[250px]">
+                    <h3 class="font-medium text-gray-700 dark:text-gray-300 mb-2">Template สำหรับ "แยกชื่อ"</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">มีคอลัมน์: ชื่อ-สกุล</p>
+                    <div class="flex gap-2">
+                        <button id="downloadSplitTemplateCSV" class="btn-template bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 text-green-800 dark:text-green-200 py-2 px-4 rounded-lg text-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            CSV
+                        </button>
+                        <button id="downloadSplitTemplateExcel" class="btn-template bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-800 dark:text-blue-200 py-2 px-4 rounded-lg text-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 mb-8 transition-colors">
+            <h2 class="text-xl font-semibold mb-4 text-cyan-700 dark:text-cyan-300">2. อัปโหลดไฟล์และเลือกการดำเนินการ</h2>
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="flex-1">
+                    <!-- ========== THIS IS THE CORRECTED PART ========== -->
+                    <label for="fileInput" class="h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-cyan-500 dark:hover:border-cyan-400 transition-colors" id="dropZone">
+                        <input type="file" id="fileInput" class="hidden" accept=".csv, .xlsx, .xls">
+                        <svg class="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p id="dropZoneText" class="mt-2 text-sm text-gray-600 dark:text-gray-400">คลิกหรือลากไฟล์มาวางที่นี่</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-500">รองรับไฟล์ .csv, .xlsx, .xls</p>
+                    </label>
+                    <!-- ============================================= -->
+                </div>
+                <div class="flex-1 md:max-w-xs">
+                    <div class="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 h-full flex flex-col justify-center">
+                        <h3 class="font-medium text-gray-700 dark:text-gray-300 mb-3">การดำเนินการ</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center">
+                                <input type="radio" id="combineNames" name="operation" value="combine" checked class="w-4 h-4 text-cyan-600 bg-gray-100 border-gray-300 focus:ring-cyan-500 dark:focus:ring-cyan-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="combineNames" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">รวมชื่อ (คำนำหน้า + ชื่อ + สกุล)</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="radio" id="splitNames" name="operation" value="split" class="w-4 h-4 text-cyan-600 bg-gray-100 border-gray-300 focus:ring-cyan-500 dark:focus:ring-cyan-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="splitNames" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">แยกชื่อ (จากชื่อเต็ม)</label>
+                            </div>
+                        </div>
+                        <button id="processBtn" class="btn-primary w-full py-2.5 px-4 rounded-lg text-white font-semibold mt-4 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none" disabled>
+                            ประมวลผล
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultSection" class="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 mb-8 transition-colors hidden">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+                <h2 class="text-xl font-semibold text-cyan-700 dark:text-cyan-300">3. ผลลัพธ์และดาวน์โหลด</h2>
+                <div class="flex gap-2">
+                    <button id="downloadCSV" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        ดาวน์โหลด CSV
+                    </button>
+                    <button id="downloadExcel" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        ดาวน์โหลด Excel
+                    </button>
+                </div>
+            </div>
+             <p id="table-info" class="text-sm text-gray-500 dark:text-gray-400 mb-3"></p>
+            <div class="table-container border border-gray-200 dark:border-gray-700 rounded-lg">
+                <table id="resultTable" class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-slate-700">
+                        <tr id="tableHeader"></tr>
+                    </thead>
+                    <tbody id="tableBody" class="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl flex flex-col items-center">
+                <div class="loader mb-4"></div>
+                <p id="loadingText" class="text-gray-700 dark:text-gray-300">กำลังประมวลผล...</p>
+            </div>
+        </div>
+        
+        <footer class="mt-12 text-center text-gray-600 dark:text-gray-400 text-sm">
+             <div class="mb-4">
+                <p>ช่องทางการติดต่อ</p>
+                <a href="https://www.facebook.com/fdnkw" target="_blank" class="inline-flex items-center text-cyan-600 dark:text-cyan-400 hover:underline mt-1">
+                    <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"></path>
+                    </svg>
+                    Facebook: Fadil Nkw
+                </a>
+            </div>
+            <p>© www.krufadil.in.th</p>
+        </footer>
+    </div>
+
+    <script>
+        // DOM Elements
+        const themeToggle = document.getElementById('themeToggle');
+        const lightIcon = document.getElementById('lightIcon');
+        const darkIcon = document.getElementById('darkIcon');
+        const html = document.documentElement;
+        const dropZone = document.getElementById('dropZone');
+        const dropZoneText = document.getElementById('dropZoneText');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const resultSection = document.getElementById('resultSection');
+        const tableHeader = document.getElementById('tableHeader');
+        const tableBody = document.getElementById('tableBody');
+        const tableInfo = document.getElementById('table-info');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const downloadCSVBtn = document.getElementById('downloadCSV');
+        const downloadExcelBtn = document.getElementById('downloadExcel');
+        const downloadCombineTemplateCSV = document.getElementById('downloadCombineTemplateCSV');
+        const downloadCombineTemplateExcel = document.getElementById('downloadCombineTemplateExcel');
+        const downloadSplitTemplateCSV = document.getElementById('downloadSplitTemplateCSV');
+        const downloadSplitTemplateExcel = document.getElementById('downloadSplitTemplateExcel');
+
+        // State variables
+        let fileData = null;
+        let processedData = null;
+        let originalFileName = 'name_processor';
+        const MAX_ROWS_TO_DISPLAY = 100;
+
+        // --- Theme Toggle ---
+        const applyTheme = (theme) => {
+            if (theme === 'dark') {
+                html.classList.add('dark');
+                lightIcon.classList.add('hidden');
+                darkIcon.classList.remove('hidden');
+            } else {
+                html.classList.remove('dark');
+                lightIcon.classList.remove('hidden');
+                darkIcon.classList.add('hidden');
+            }
+        };
+        const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(savedTheme);
+        themeToggle.addEventListener('click', () => {
+            const newTheme = html.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        });
+        
+        // --- Template Download ---
+        const combineTemplateData = [
+            { "คำนำหน้า": "นาย", "ชื่อ": "สมชาย", "นามสกุล": "ใจดี" },
+            { "คำนำหน้า": "นางสาว", "ชื่อ": "สมศรี", "นามสกุล": "รักเรียน" },
+            { "เด็กชาย": "สมหมาย", "ชื่อ": "เรียนดี", "นามสกุล": "" },
+        ];
+        const splitTemplateData = [{ "ชื่อ-สกุล": "พล.ต.อ. สมศักดิ์ เทพสุทิน" }];
+
+        const downloadFile = (content, fileName, contentType) => {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+        
+        downloadCombineTemplateCSV.addEventListener('click', () => {
+            const csv = Papa.unparse(combineTemplateData);
+            downloadFile("\uFEFF" + csv, 'template_combine_names.csv', 'text/csv;charset=utf-8;');
+        });
+
+        downloadCombineTemplateExcel.addEventListener('click', () => {
+            const ws = XLSX.utils.json_to_sheet(combineTemplateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Template');
+            XLSX.writeFile(wb, 'template_combine_names.xlsx');
+        });
+
+        downloadSplitTemplateCSV.addEventListener('click', () => {
+            const csv = Papa.unparse(splitTemplateData);
+            downloadFile("\uFEFF" + csv, 'template_split_names.csv', 'text/csv;charset=utf-8;');
+        });
+
+        downloadSplitTemplateExcel.addEventListener('click', () => {
+            const ws = XLSX.utils.json_to_sheet(splitTemplateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Template');
+            XLSX.writeFile(wb, 'template_split_names.xlsx');
+        });
+
+        // --- File Upload Logic ---
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => e.preventDefault());
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('border-cyan-500', 'dark:border-cyan-400', 'bg-cyan-50', 'dark:bg-slate-700'));
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-cyan-500', 'dark:border-cyan-400', 'bg-cyan-50', 'dark:bg-slate-700'));
+        });
+
+        dropZone.addEventListener('drop', e => {
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', e => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        const showLoading = (text) => {
+            loadingText.textContent = text;
+            loadingOverlay.classList.remove('hidden');
+        };
+        const hideLoading = () => loadingOverlay.classList.add('hidden');
+
+        function handleFile(file) {
+            originalFileName = file.name.split('.').slice(0, -1).join('.') || 'file';
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            showLoading("กำลังอ่านไฟล์...");
+
+            const onParseComplete = (data) => {
+                fileData = data.filter(row => Object.values(row).some(val => val !== null && val !== ''));
+                if (fileData.length > 0) {
+                    processBtn.disabled = false;
+                    dropZoneText.textContent = `ไฟล์ที่เลือก: ${file.name}`;
+                    dropZoneText.classList.add('text-green-600', 'dark:text-green-400', 'font-semibold');
+                    resultSection.classList.add('hidden'); // Hide old results
+                } else {
+                    alert('ไม่พบข้อมูลที่สามารถประมวลผลได้ในไฟล์');
+                    processBtn.disabled = true;
+                }
+                hideLoading();
+            };
+
+            if (fileExtension === 'csv') {
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: results => onParseComplete(results.data),
+                    error: err => { alert('เกิดข้อผิดพลาดในการอ่าน CSV: ' + err); hideLoading(); }
+                });
+            } else if (['xlsx', 'xls'].includes(fileExtension)) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        const workbook = XLSX.read(e.target.result, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                        onParseComplete(jsonData);
+                    } catch (error) {
+                        alert('เกิดข้อผิดพลาดในการอ่าน Excel: ' + error);
+                        hideLoading();
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('รองรับเฉพาะไฟล์ .csv, .xlsx, .xls เท่านั้น');
+                hideLoading();
+            }
+        }
+
+        // --- Processing Logic ---
+        processBtn.addEventListener('click', () => {
+            if (!fileData) return;
+            showLoading("กำลังประมวลผล...");
+            setTimeout(() => { // Simulate processing time for better UX
+                const operation = document.querySelector('input[name="operation"]:checked').value;
+                processedData = (operation === 'combine') ? processCombineNames(fileData) : processSplitNames(fileData);
+                displayResults(processedData);
+                hideLoading();
+            }, 300);
+        });
+        
+        function processCombineNames(data) {
+            return data.map(row => {
+                const newRow = { ...row };
+                const keys = Object.keys(row);
+                let title = '', firstName = '', lastName = '';
+                
+                keys.forEach(key => {
+                    const lk = key.toLowerCase();
+                    if (lk.includes('คำนำหน้า') || lk.includes('title')) title = newRow[key] || '';
+                    else if ((lk.includes('ชื่อ') && !lk.includes('สกุล')) || lk.includes('first')) firstName = newRow[key] || '';
+                    else if (lk.includes('สกุล') || lk.includes('last') || lk.includes('surname')) lastName = newRow[key] || '';
+                });
+
+                newRow['ชื่อ-สกุล'] = [title, firstName, lastName].filter(Boolean).join(' ').trim();
+                return newRow;
+            });
+        }
+
+        function processSplitNames(data) {
+            const thaiTitles = [
+                'ดร.', 'นพ.', 'ทพ.', 'สพ.', 'ภก.', 'ผศ.', 'รศ.', 'ศ.', 
+                'พล.อ.อ.', 'พล.อ.', 'พล.ท.', 'พล.ต.', 'พ.อ.', 'พ.ท.', 'พ.ต.', 'ร.อ.', 'ร.ท.', 'ร.ต.',
+                'พล.ร.อ.', 'พล.ร.ท.', 'พล.ร.ต.', 'น.อ.', 'น.ท.', 'น.ต.', 'ร.อ.', 'ร.ท.', 'ร.ต.',
+                'พล.ต.อ.', 'พล.ต.ท.', 'พล.ต.ต.', 'พ.ต.อ.', 'พ.ต.ท.', 'พ.ต.ต.', 'ร.ต.อ.', 'ร.ต.ท.', 'ร.ต.ต.',
+                'นาย', 'นาง', 'นางสาว', 'น.ส.', 'เด็กชาย', 'ด.ช.', 'เด็กหญิง', 'ด.ญ.', 'ว่าที่ร้อยตรี'
+            ].sort((a, b) => b.length - a.length); // Sort by length descending to match longer titles first
+
+            return data.map(row => {
+                const newRow = { ...row, 'คำนำหน้า': '', 'ชื่อ': '', 'นามสกุล': '' };
+                const keys = Object.keys(row);
+                let fullName = '';
+                
+                const fullNameKey = keys.find(k => k.toLowerCase().includes('ชื่อ-สกุล') || k.toLowerCase().includes('fullname'));
+                fullName = fullNameKey ? (row[fullNameKey] || '').toString().trim() : '';
+
+                if (!fullName) { // Fallback if no specific column found
+                    const firstStringValue = Object.values(row).find(v => typeof v === 'string' && v.includes(' '));
+                    if (firstStringValue) fullName = firstStringValue.trim();
+                }
+
+                if (fullName) {
+                    let title = '';
+                    let remainingName = fullName;
+
+                    const foundTitle = thaiTitles.find(t => fullName.startsWith(t));
+                    if (foundTitle) {
+                        title = foundTitle;
+                        remainingName = fullName.substring(foundTitle.length).trim();
+                    }
+                    
+                    const nameParts = remainingName.split(' ');
+                    newRow['คำนำหน้า'] = title;
+                    newRow['ชื่อ'] = nameParts[0] || '';
+                    newRow['นามสกุล'] = nameParts.slice(1).join(' ');
+                }
+                return newRow;
+            });
+        }
+        
+        // --- Display and Download Results ---
+        function displayResults(data) {
+            if (!data || data.length === 0) {
+                resultSection.classList.add('hidden');
+                return;
+            }
+
+            tableHeader.innerHTML = '';
+            tableBody.innerHTML = '';
+            resultSection.classList.remove('hidden');
+            
+            const headers = Object.keys(data[0]);
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider';
+                tableHeader.appendChild(th);
+            });
+            
+            const dataToDisplay = data.slice(0, MAX_ROWS_TO_DISPLAY);
+            dataToDisplay.forEach((row, rowIndex) => {
+                const tr = document.createElement('tr');
+                tr.className = rowIndex % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-gray-50 dark:bg-slate-700';
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = row[header] || '';
+                    td.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300';
+                    tr.appendChild(td);
+                });
+                tableBody.appendChild(tr);
+            });
+
+            if (data.length > MAX_ROWS_TO_DISPLAY) {
+                tableInfo.textContent = `แสดงผล ${MAX_ROWS_TO_DISPLAY} แถวแรกจากทั้งหมด ${data.length} แถว (ไฟล์ที่ดาวน์โหลดจะมีข้อมูลทั้งหมด)`;
+            } else {
+                tableInfo.textContent = `แสดงผลทั้งหมด ${data.length} แถว`;
+            }
+        }
+
+        const downloadProcessedFile = (format) => {
+            if (!processedData) { alert('ไม่มีข้อมูลสำหรับดาวน์โหลด'); return; }
+            
+            showLoading(`กำลังสร้างไฟล์ ${format.toUpperCase()}...`);
+            setTimeout(() => { // Simulate generation time
+                try {
+                    if (format === 'csv') {
+                        const csv = Papa.unparse(processedData);
+                        downloadFile("\uFEFF" + csv, `${originalFileName}_processed.csv`, 'text/csv;charset=utf-8;');
+                    } else if (format === 'excel') {
+                        const ws = XLSX.utils.json_to_sheet(processedData);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, 'Processed Data');
+                        XLSX.writeFile(wb, `${originalFileName}_processed.xlsx`);
+                    }
+                } catch (error) {
+                    alert(`เกิดข้อผิดพลาดในการสร้างไฟล์ ${format.toUpperCase()}: ${error}`);
+                } finally {
+                    hideLoading();
+                }
+            }, 300);
+        };
+
+        downloadCSVBtn.addEventListener('click', () => downloadProcessedFile('csv'));
+        downloadExcelBtn.addEventListener('click', () => downloadProcessedFile('excel'));
+
+    </script>
+</body>
+</html>
